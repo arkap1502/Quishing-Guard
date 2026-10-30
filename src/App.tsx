@@ -5,11 +5,14 @@ import './App.css';
 
 type Saved = { id: string; createdAt: string; result: Analysis };
 const HISTORY_KEY = 'quishing-guard-history';
+const THEME_KEY = 'quishing-guard-theme';
 function readHistory(): Saved[] { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } }
 function App() {
   const [result, setResult] = useState<Analysis | null>(null); const [history, setHistory] = useState<Saved[]>(readHistory); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [dragging, setDragging] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => { try { return localStorage.getItem(THEME_KEY) === 'dark'; } catch { return false; } });
   const [camera, setCamera] = useState(false); const fileRef = useRef<HTMLInputElement>(null); const videoRef = useRef<HTMLVideoElement>(null); const streamRef = useRef<MediaStream|null>(null);
   useEffect(() => { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0,30))); }, [history]);
+  useEffect(() => { try { localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light'); } catch {} }, [darkMode]);
   useEffect(() => { return () => streamRef.current?.getTracks().forEach(t=>t.stop()); }, []);
   function showPayload(payload: string) { const analysis = analyzePayload(payload); setResult(analysis); setError(''); setCamera(false); streamRef.current?.getTracks().forEach(t=>t.stop()); streamRef.current=null; setHistory(prev=>[{id: crypto.randomUUID(),createdAt:new Date().toISOString(),result:analysis},...prev].slice(0,30)); }
   async function scanFile(file?: File) {
@@ -27,8 +30,8 @@ function App() {
   async function copyPayload() { if(result) try { await navigator.clipboard.writeText(result.payload); setError('Copied to clipboard.'); } catch { setError('Clipboard access is unavailable.'); } }
   function restore(item: Saved) { setResult(item.result); setError(''); window.scrollTo({top:0,behavior:'smooth'}); }
   const verdictClass = result?.verdict === 'Safe' ? 'safe' : result?.verdict === 'Caution' ? 'caution' : 'danger';
-  return <main className="app-shell">
-    <header className="topbar"><a className="brand" href="#top" onClick={()=>setResult(null)}><span className="brand-mark">Q</span><span>quishing<span className="brand-light"> guard</span></span></a><span className="privacy-pill"><i/> Private by design</span></header>
+  return <main className="app-shell" data-theme={darkMode ? 'dark' : 'light'}>
+    <header className="topbar"><a className="brand" href="#top" onClick={()=>setResult(null)}><span className="brand-mark">Q</span><span>quishing<span className="brand-light"> guard</span></span></a><div className="header-actions"><button className="theme-toggle" type="button" onClick={()=>setDarkMode(value=>!value)} aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`} aria-pressed={darkMode}><span aria-hidden="true">{darkMode ? '☀' : '☾'}</span><span className="theme-label">{darkMode ? 'Light mode' : 'Dark mode'}</span></button><span className="privacy-pill"><i/> Private by design</span></div></header>
     <section className="hero" id="top"><div className="eyebrow"><span className="eyebrow-icon">✳</span> YOUR QR, DECODED</div><h1>Scan before<br/><span>you trust.</span></h1><p>See what a QR code really contains before you open a link, join a network, or send money.</p><div className="hero-trust"><span>◉ Decoded on your device</span><span>↗ Nothing opens automatically</span></div></section>
     <section className="work-area">
       {!result && <div className={`scan-card ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void scanFile(e.dataTransfer.files[0]);}}>
